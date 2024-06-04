@@ -44,6 +44,8 @@ def format_label(value: LABEL_TYPE) -> torch.Tensor:
         value = torch.tensor(value).to(torch.long)
     elif isinstance(value, int):
         value = torch.LongTensor([value])
+    elif isinstance(value, float):
+        value = torch.FloatTensor([value])
     elif not isinstance(value, torch.Tensor):
         raise TypeError(f'Type {type(value)} is not an available label type.')
     assert value.ndim == 1, \
