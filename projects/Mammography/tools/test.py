@@ -9,6 +9,9 @@ from mmengine.config import Config, ConfigDict, DictAction
 from mmengine.evaluator import DumpResults
 from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
+from projects.Mammography.models import *
+from projects.Mammography.dataset import *
+from projects.Mammography.evaluation import *
 
 
 def parse_args():
@@ -165,6 +168,9 @@ def main():
 
     # load config
     cfg = Config.fromfile(args.config)
+
+    if args.out_item in ['pred']:
+        cfg.test_evaluator = dict(type="DumpResults",out_file_path=".pkl",collect_device='gpu')
 
     # merge cli arguments to config
     cfg = merge_args(cfg, args)

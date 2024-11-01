@@ -4,7 +4,7 @@ _base_ = [
 
 # >>>>>>>>>>>>>>> Override data settings here >>>>>>>>>>>>>>>>>>>
 dataset_type = 'MammoSingleTaskDataset'
-data_root = '/home/avesta/daqu/Projects/Mammography/privateData/cohort12_ROIs_certaintyNone_2layers_5fold/ROI500/0'
+data_root = 'DATAPATH'
 data_preprocessor = dict(
     # RGB format normalization parameters, this is decided by the pretrianed model
     mean=[127.5, 127.5, 127.5],

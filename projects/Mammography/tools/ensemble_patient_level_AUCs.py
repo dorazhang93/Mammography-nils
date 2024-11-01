@@ -6,7 +6,8 @@ import scipy
 import numpy as np
 from sklearn.utils import resample
 import torch.nn.functional as F
-from sklearn.metrics import roc_auc_score, average_precision_score, r2_score
+from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, roc_curve, precision_recall_curve
+from scipy.stats import pearsonr
 import json
 
 
@@ -144,13 +145,17 @@ def load_single_prediction(args):
 def bootstrap_metrics(df, repeat_num, metric):
     evaluator={"roc":roc_auc_score,
                'pr':average_precision_score,
-               'r2':r2_score}
+               'r2':r2_score,
+               'pearsonr':pearsonr}
     ms=[]
     bootstrap_sample_size=len(df)
     for i in range(repeat_num):
         fortnrs, target, predict = resample(df.fortnr.values, df.gt_label.values, df.predict.values, replace=True,
                                             n_samples=bootstrap_sample_size, stratify=df.gt_label.values)
-        ms.append(evaluator[metric](target,predict))
+        if metric!='pearsonr':
+            ms.append(evaluator[metric](target,predict))
+        else:
+            ms.append(evaluator[metric](target, predict)[0])
     return np.array(ms).mean(), np.array(ms).std()
 
 def binary_classify_result(data, task, bootstrap_repeat_num):
@@ -169,10 +174,12 @@ def binary_classify_result(data, task, bootstrap_repeat_num):
 
 def regress_result(data, task, bootstrap_repeat_num):
     if data[task].empty:
-        return {"r2":-9}, {"r2":{"mean":-9, "std":-9}}
+        return {"r2":-9,"pearsonr":-9}, {"r2":{"mean":-9, "std":-9},"pearsonr":{"mean":-9, "std":-9}}
     r2=r2_score(data[task].gt_label, data[task].predict)
     r2_mean, r2_std=bootstrap_metrics(data[task],bootstrap_repeat_num,'r2')
-    return {"r2":r2}, {"r2":{"mean":r2_mean, "std":r2_std}}
+    prr=pearsonr(data[task].gt_label, data[task].predict)[0]
+    prr_mean, prr_std = bootstrap_metrics(data[task], bootstrap_repeat_num, 'pearsonr')
+    return {"r2":r2,"pearsonr":prr}, {"r2":{"mean":r2_mean, "std":r2_std},"pearsonr":{"mean":prr_mean, "std":prr_std}}
 
 
 def average_aucs(args):
@@ -207,6 +214,18 @@ def average_aucs(args):
           f"pr {np.array(prs).mean()}, {np.array(prs).std()}")
     return
 
+def auc_curve_result(data,task):
+    if data[task].empty:
+        return {"roc": {}, "pr": {}}
+    r1, r2, thred = roc_curve(data[task].gt_label,data[task].predict)
+    assert len(r1)==len(r2)
+    roc_points={'x':r1.tolist(),'y':r2.tolist(),'thred':thred.tolist()}
+
+    r1, r2, thred = precision_recall_curve(data[task].gt_label,data[task].predict)
+    assert len(r1)==len(r2)
+    pr_points={'x':r2.tolist(),'y':r1.tolist(),'thred':thred.tolist()}
+    return {'roc':roc_points,'pr':pr_points}
+
 def main():
     args = parse_args()
 
@@ -222,12 +241,13 @@ def main():
     if args.patient_list !="None":
         print(f"select patients using {args.patient_list}")
         fortnrs_list=np.loadtxt(args.patient_list, dtype='str')
-        mbtst={}
         for k,v in data.items():
             data[k]=v[v.fortnr.isin(fortnrs_list.tolist())].reset_index(drop=True)
-            mbtst[k]=v[v.fortnr.str.startswith("mbtst")].reset_index(drop=True)
-            print(f" mbtst has {len(mbtst[k])} patients")
-        data_dict['mbtst']=mbtst
+            mbtst=v[v.fortnr.str.startswith("mbtst")].reset_index(drop=True)
+            print(f" mbtst has {len(mbtst)} patients")
+    else:
+        for k,v in data.items():
+            data[k]=v[~v.fortnr.str.startswith("mbtst")].reset_index(drop=True)
     data_dict["all"]=data
     if args.split_cohort:
         print(f"split predictions into cohort1 and cohort2")
@@ -246,11 +266,15 @@ def main():
     overall={}
     #bootstrap results
     bootstrap={}
+    #AUC_curve points
+    auc_curves={}
     bootstrap_repeat_num=args.bootstrap_repeat_num
     for datasetname, data in data_dict.items():
         overall[datasetname]={}
         bootstrap[datasetname]={}
+        auc_curves[datasetname]={}
         for task in data.keys():
+            print(f"{datasetname} has {len(data[task])} patients for {task}")
             if task in ['multifocality', 'LVI', 'N']:
                 task_result_overall, task_result_bootstrap=binary_classify_result(data,task,bootstrap_repeat_num)
                 overall[datasetname][task]=task_result_overall
@@ -258,6 +282,7 @@ def main():
                 print(
                     f"{datasetname}, {task} roc :{task_result_overall['roc']}, "
                     f"pr :{task_result_overall['pr']}")
+                auc_curves[datasetname][task]=auc_curve_result(data,task)
 
             elif task == 'NumPos':
                 if args.Npos_softmax:
@@ -274,15 +299,15 @@ def main():
                     overall[datasetname][task] = task_result_overall
                     bootstrap[datasetname][task] = task_result_bootstrap
                     print(
-                        f"{datasetname}, {task} r2 :{task_result_overall['r2']} ")
+                        f"{datasetname}, {task} r2 :{task_result_overall['r2']} , pearsonr: {task_result_overall['pearsonr']}")
             else:
                 task_result_overall, task_result_bootstrap = regress_result(data, task, bootstrap_repeat_num)
                 overall[datasetname][task] = task_result_overall
                 bootstrap[datasetname][task] = task_result_bootstrap
                 print(
-                    f"{datasetname}, {task} r2 :{task_result_overall['r2']} ")
+                    f"{datasetname}, {task} r2 :{task_result_overall['r2']}, pearsonr: {task_result_overall['pearsonr']} ")
 
-    results={"overall":overall,"bootstrap":bootstrap}
+    results={"overall":overall,"bootstrap":bootstrap,"auc_curve":auc_curves}
     with open(f"{args.work_dir}/{args.out_file}","w") as f:
         f.write(json.dumps(results))
 

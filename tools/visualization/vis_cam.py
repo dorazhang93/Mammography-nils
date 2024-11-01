@@ -2,6 +2,8 @@
 import argparse
 import copy
 import math
+
+import cv2
 import pkg_resources
 from functools import partial
 from pathlib import Path
@@ -18,6 +20,9 @@ from mmengine.utils.dl_utils import is_norm
 from mmpretrain import digit_version
 from mmpretrain.apis import get_model
 from mmpretrain.registry import TRANSFORMS
+from projects.Mammography.models import *
+from projects.Mammography.dataset import *
+from projects.Mammography.evaluation import *
 
 try:
     import pytorch_grad_cam as cam
@@ -45,7 +50,15 @@ def parse_args():
     parser.add_argument('checkpoint', help='Checkpoint file')
     parser.add_argument(
         '--target-layers',
-        default=[],
+        # default=['neck.res_blocks.0.relu'],
+        # default=['neck.res_blocks.1.relu'],
+        # default=['neck.res_blocks.1.conv3.1'],
+        # attention map
+        default=['neck.transformer.layers.0.0.attend'],
+        # default=['neck.transformer.layers.1.0.attend'],
+        # conv activation
+        # default=['neck.transformer.layers.0.0.norm'],
+        # default=['neck.transformer.layers.1.0.norm'],
         nargs='+',
         type=str,
         help='The target layers to get CAM, if not set, the tool will '
@@ -64,7 +77,7 @@ def parse_args():
         f'{", ".join(list(METHOD_MAP.keys()))}.')
     parser.add_argument(
         '--target-category',
-        default=[],
+        default=[4],# task_idx=0 for N+, 1 for LVI, 2 for multifoc, 3 for Numpos, 4 for tsize
         nargs='+',
         type=int,
         help='The target category to get CAM, default to use result '
@@ -82,11 +95,13 @@ def parse_args():
         help='Wether to use test time augmentation, default not to use')
     parser.add_argument(
         '--save-path',
+        default='',
         type=Path,
         help='The path to save visualize cam image, default not to save.')
     parser.add_argument('--device', default='cpu', help='Device to use cpu')
     parser.add_argument(
         '--vit-like',
+        # default=True,
         action='store_true',
         help='Whether the network is a ViT-like network.')
     parser.add_argument(
@@ -117,9 +132,11 @@ def reshape_transform(tensor, model, args):
     necessary for ViT-like networks."""
     # ViT_based_Transformers have an additional clstoken in features
     if tensor.ndim == 4:
-        # For (B, C, H, W)
-        return tensor
-    elif tensor.ndim == 3:
+    #     # For (B, C, H, W)
+    #     return tensor
+    # elif tensor.ndim == 3:
+        tensor=tensor[:,:,0,:].permute(0,2,1)#b,h,n to b,n,h
+        print(tensor.shape)
         if not args.vit_like:
             raise ValueError(f"The tensor shape is {tensor.shape}, if it's a "
                              'vit-like backbone, please specify `--vit-like`.')
@@ -127,11 +144,13 @@ def reshape_transform(tensor, model, args):
         num_extra_tokens = args.num_extra_tokens or getattr(
             model.backbone, 'num_extra_tokens', 1)
 
-        tensor = tensor[:, num_extra_tokens:, :]
+        tensor = tensor[:, num_extra_tokens:, :]# b,n,H
         # get heat_map_height and heat_map_width, preset input is a square
         heat_map_area = tensor.size()[1]
-        height, width = to_2tuple(int(math.sqrt(heat_map_area)))
-        assert height * height == heat_map_area, \
+        # height, width = to_2tuple(int(math.sqrt(heat_map_area)))
+        height,width= 18,16
+        # height, width = 15,15
+        assert height * width == heat_map_area, \
             (f"The input feature's length ({heat_map_area+num_extra_tokens}) "
              f'minus num-extra-tokens ({num_extra_tokens}) is {heat_map_area},'
              ' which is not a perfect square number. Please check if you used '
@@ -143,6 +162,40 @@ def reshape_transform(tensor, model, args):
         return result
     else:
         raise ValueError(f'Unsupported tensor shape {tensor.shape}.')
+
+# def reshape_transform(tensor, model, args):
+#     """Build reshape_transform for `cam.activations_and_grads`, which is
+#     necessary for ViT-like networks."""
+#     # ViT_based_Transformers have an additional clstoken in features
+#     if tensor.ndim == 4:
+#         # For (B, C, H, W)
+#         return tensor
+#     elif tensor.ndim == 3:
+#         if not args.vit_like:
+#             raise ValueError(f"The tensor shape is {tensor.shape}, if it's a "
+#                              'vit-like backbone, please specify `--vit-like`.')
+#         # For (B, L, C)
+#         num_extra_tokens = args.num_extra_tokens or getattr(
+#             model.backbone, 'num_extra_tokens', 1)
+#
+#         tensor = tensor[:, num_extra_tokens:, :]
+#         # get heat_map_height and heat_map_width, preset input is a square
+#         heat_map_area = tensor.size()[1]
+#         # height, width = to_2tuple(int(math.sqrt(heat_map_area)))
+#         # height,width= 18,16
+#         height,width= 15,15
+#         assert height * width == heat_map_area, \
+#             (f"The input feature's length ({heat_map_area+num_extra_tokens}) "
+#              f'minus num-extra-tokens ({num_extra_tokens}) is {heat_map_area},'
+#              ' which is not a perfect square number. Please check if you used '
+#              'a wrong num-extra-tokens.')
+#         # (B, L, C) -> (B, H, W, C)
+#         result = tensor.reshape(tensor.size(0), height, width, tensor.size(2))
+#         # (B, H, W, C) -> (B, C, H, W)
+#         result = result.permute(0, 3, 1, 2)
+#         return result
+#     else:
+#         raise ValueError(f'Unsupported tensor shape {tensor.shape}.')
 
 
 def init_cam(method, model, target_layers, use_cuda, reshape_transform):
@@ -170,13 +223,14 @@ def get_layer(layer_str, model):
         '\n'.join(name for name, _ in model.named_modules()))
 
 
-def show_cam_grad(grayscale_cam, src_img, title, out_path=None):
+def show_cam_grad(grayscale_cam, src_img, title, predict,out_path=None):
     """fuse src_img and grayscale_cam and show or save."""
     grayscale_cam = grayscale_cam[0, :]
     src_img = np.float32(src_img) / 255
     visualization_img = show_cam_on_image(
         src_img, grayscale_cam, use_rgb=False)
 
+    out_path= Path(str(out_path) + "_{:.3f}".format(predict)+".png")
     if out_path:
         mmcv.imwrite(visualization_img, str(out_path))
     else:
@@ -261,13 +315,13 @@ def main():
             targets = args.target_category
 
     # calculate cam grads and show|save the visualization image
-    grayscale_cam = cam(
+    grayscale_cam, prediction = cam(
         data['inputs'],
         targets,
         eigen_smooth=args.eigen_smooth,
         aug_smooth=args.aug_smooth)
     show_cam_grad(
-        grayscale_cam, src_img, title=args.method, out_path=args.save_path)
+        grayscale_cam, src_img, title=args.method, predict=prediction, out_path=args.save_path)
 
 
 if __name__ == '__main__':

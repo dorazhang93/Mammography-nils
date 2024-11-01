@@ -117,7 +117,8 @@ class ImageTabClassifier(BaseClassifier):
         """
         if mode == 'tensor':
             feats = self.extract_feat(inputs)
-            return self.head(feats,data_samples) if self.with_head else feats
+            return feats
+            # return self.head(feats,data_samples) if self.with_head else feats
         elif mode == 'loss':
             return self.loss(inputs, data_samples)
         elif mode == 'predict':

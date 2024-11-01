@@ -4,7 +4,7 @@ _base_ = [
 
 # >>>>>>>>>>>>>>> Override data settings here >>>>>>>>>>>>>>>>>>>
 dataset_type = 'MammoSingleTaskDataset'
-data_root = '/home/avesta/daqu/Projects/Mammography/privateData/cohort12_ROIs_certaintyNone_2layers_5fold/ROI500/0'
+data_root = 'DATAPATH'
 data_preprocessor = dict(
     # RGB format normalization parameters, this is decided by the pretrianed model
     mean=[127.5, 127.5, 127.5],
@@ -33,11 +33,19 @@ train_pipeline = [
     dict(type='PackInputs'),
 ]
 
+# test_pipeline = [
+#     dict(type='LoadImageFromFile'),
+#     dict(type='RandomResizedCrop', scale=500, crop_ratio_range=(0.5, 1.0)),
+#     dict(type='RandomFlip', prob=0.5, direction='horizontal'),
+#     dict(type='PackInputs'),
+# ]
+
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='Resize', scale=500),
     dict(type='PackInputs'),
 ]
+
 train_dataloader = dict(
     batch_size=64,
     num_workers=8,

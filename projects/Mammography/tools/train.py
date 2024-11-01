@@ -9,6 +9,10 @@ from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
 from mmengine.utils import digit_version
 from mmengine.utils.dl_utils import TORCH_VERSION
+from projects.Mammography.models import *
+from projects.Mammography.dataset import *
+from projects.Mammography.evaluation import *
+
 
 
 def parse_args():

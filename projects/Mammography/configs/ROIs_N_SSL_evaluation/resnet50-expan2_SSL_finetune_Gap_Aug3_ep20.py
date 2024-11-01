@@ -4,7 +4,7 @@ _base_ = [
 
 # >>>>>>>>>>>>>>> Override data settings here >>>>>>>>>>>>>>>>>>>
 dataset_type = 'MammoSingleTaskDataset'
-data_root = '/home/avesta/daqu/Projects/Mammography/privateData/cohort12_ROIs_certaintyNone_2layers_5fold/0'
+data_root = 'DATAPATH'
 data_preprocessor = dict(
     # RGB format normalization parameters, this is decided by the pretrianed model
     mean=[127.5, 127.5, 127.5],
@@ -77,21 +77,22 @@ test_evaluator = val_evaluator
 model = dict(
     type='ImageTabClassifier',
     backbone=dict(
-        type='ResNet',
+        type='ResNetWs',
         depth=50,
         num_stages=4,
+        expansion=2,
         out_indices=(3,),
         style='pytorch',
         frozen_stages=4,
         init_cfg=dict(
             type='Pretrained',
-            checkpoint='/home/avesta/daqu/Projects/Mammography/mmpretrain/work_dirs_ssl/byol/ckpt/epoch_80.pth',
+            checkpoint='CHECKPOINTDIR',
             prefix='backbone',
         ),),
     neck=dict(type='GlobalAveragePooling'),
     head=dict(type='SingleLinearClsHead',
               num_classes=1,
-              in_channels=2048,
+              in_channels=1024,
               loss_weight=1.0,
               loss=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),# use_sigmoid=True call function F.binary_cross_entropy_with_logits
               ),
