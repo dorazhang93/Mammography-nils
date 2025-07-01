@@ -21,7 +21,7 @@ policies = [
 ]
 train_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='RandomResizedCrop', scale=500, crop_ratio_range=(0.5, 1.0)),
+    dict(type='RandomResizedCrop', scale=(1792,1024), crop_ratio_range=(0.5, 0.9),aspect_ratio_range=(4./8.,6./8.)),
     dict(type='RandomFlip', prob=0.5, direction='horizontal'),
     dict(type='RandAugment',
          policies=policies,
@@ -39,7 +39,8 @@ train_pipeline = [
 
 test_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='Resize', scale=500),# scale=(w,h)
+    dict(type='Resize', scale=(1152,2048)),# scale=(w,h)
+    dict(type='CenterCrop', crop_size=(1024,1792)),# crop_size=(w,h))
     dict(type='MammoPackMultiTaskInputs', multi_task_fields=('gt_label',),
          task_handlers=dict(N=dict(type='PackInputs',algorithm_keys=['clinic_vars']),
                                 LVI=dict(type='PackInputs',algorithm_keys=['clinic_vars']),
@@ -109,16 +110,11 @@ model = dict(
             checkpoint='mmpretrain/work_dirs_ssl/barlowtwins_ep100_cancer_240k/ckpt/epoch_80.pth',
             prefix='backbone',
         ),),
-    neck=dict(type='TransformerNeck',
-              in_dims=1024,
-              out_dims=5,
-              depth=1,
-              num_heads=8,
-              head_dim=64,
-              pooling_size=1,
-              forward_layer=True,
-              ff_hidden_layer=True,
-              is_LSA=True,
+    neck=dict(type='DwiseConvResBlockPooling',
+              in_channels=1024,
+              out_channels=5,
+              num_block=2,
+              expansion_ratio=8,
               ),
     head=dict(type='MultiTaskHead',
               task_heads=dict(
@@ -133,7 +129,6 @@ model = dict(
                   tumor_size=dict(num_classes=1,in_channels=1,task_idx=4,loss_weight=0.5,
                               loss=dict(type='MSELoss'),type='TsizeRegHead'),
               )),
-
 )
 
 # >>>>>>>>>>>>>>> Override schedules settings here >>>>>>>>>>>>>>>>>>>

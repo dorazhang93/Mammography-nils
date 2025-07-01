@@ -4,7 +4,7 @@ _base_ = [
 
 ################################### dataset ##################################
 dataset_type = 'MammoMultiTaskDataset'
-data_root = 'Projects/Mammography/privateData'
+data_root = 'Mammography/privateData'
 data_preprocessor = dict(
     # RGB format normalization parameters, this is decided by the pretrianed model
     mean=[127.5, 127.5, 127.5],
@@ -21,7 +21,7 @@ policies = [
 ]
 train_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='RandomResizedCrop', scale=(1792,1024), crop_ratio_range=(0.5, 0.9),aspect_ratio_range=(4./8.,6./8.)),
+    dict(type='RandomResizedCrop', scale=500, crop_ratio_range=(0.5, 1.0)),
     dict(type='RandomFlip', prob=0.5, direction='horizontal'),
     dict(type='RandAugment',
          policies=policies,
@@ -39,8 +39,7 @@ train_pipeline = [
 
 test_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='Resize', scale=(1152,2048)),# scale=(w,h)
-    dict(type='CenterCrop', crop_size=(1024,1792)),# crop_size=(w,h))
+    dict(type='Resize', scale=500),# scale=(w,h)
     dict(type='MammoPackMultiTaskInputs', multi_task_fields=('gt_label',),
          task_handlers=dict(N=dict(type='PackInputs',algorithm_keys=['clinic_vars']),
                                 LVI=dict(type='PackInputs',algorithm_keys=['clinic_vars']),
@@ -107,19 +106,14 @@ model = dict(
         frozen_stages=4,
         init_cfg=dict(
             type='Pretrained',
-            checkpoint='work_dirs_ssl/byol/ckpt/epoch_80.pth',
+            checkpoint='mmpretrain/work_dirs_ssl/barlowtwins_ep100_cancer_240k/ckpt/epoch_80.pth',
             prefix='backbone',
         ),),
-    neck=dict(type='TransformerNeck',
-              in_dims=1024,
-              out_dims=5,
-              depth=1,
-              num_heads=8,
-              head_dim=64,
-              pooling_size=2,
-              forward_layer=True,
-              ff_hidden_layer=True,
-              is_LSA=True,
+    neck=dict(type='DwiseConvResBlockPooling',
+              in_channels=1024,
+              out_channels=5,
+              num_block=1,
+              expansion_ratio=8,
               ),
     head=dict(type='MultiTaskHead',
               task_heads=dict(
@@ -170,7 +164,7 @@ auto_scale_lr = dict(base_batch_size=256)
 
 
 # >>>>>>>>>>>>>>> Override default_runtime settings here >>>>>>>>>>>>>>>>>>>
-log_processor=dict(window_size=30)
+log_processor=dict(window_size=20)
 # configure default hooks
 default_hooks = dict(
     # print log every 100 iterations.

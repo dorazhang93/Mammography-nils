@@ -123,16 +123,25 @@ class TransformerNeck(BaseModule):
         super(TransformerNeck, self).__init__()
         dim=in_dims
         if pooling_size==4:
-            self.num_patches=14*8
+            # 512x512 full-breast
+            self.num_patches=15*15
+        elif pooling_size==3:
+            # 896x512 full-breast
+            self.num_patches=14*15
         elif pooling_size==2:
+            # 1792x1024 full-breast
             self.num_patches=18*16
         elif pooling_size==1:
+            # 500x500 ROI
             self.num_patches=15*15
         else:
             raise ValueError(f"Invalid pooling size {pooling_size}")
         print(f"Pooling size {pooling_size}, number of patches {self.num_patches}")
 
-        self.pooling= nn.AvgPool2d(2,stride=1) if pooling_size==1 else nn.AvgPool2d((4,3),stride=(3,2),padding=(0,1))
+        self.pooling= nn.AvgPool2d(2,stride=1) if pooling_size==1 else \
+            nn.AvgPool2d((4,3),stride=(3,2),padding=(0,1)) if pooling_size==2 else \
+            nn.AvgPool2d((3,2), stride=(2,1), padding=(1,0)) if pooling_size==3 else \
+            nn.AvgPool2d(2, stride=1)
         self.pos_embedding = nn.Parameter(torch.randn(1, self.num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(0.2)
