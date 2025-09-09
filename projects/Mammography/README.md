@@ -20,13 +20,12 @@ python 3.8.18, check environment.yml for needed packages. The listed lib-verions
 
 2.Create conda environment
 
-```conda env create --name VIR_ENV_NAME --file=environment.yml --force```
+```cd Mammography-nils```
+```conda env create --name VIR_ENV_NAME --file=projects/Mammography/environment.yml --force```
 
 ### Activate the created conda environment
 
 ```conda activate VIR_ENV_NAME```
-
-```cd Mammography-nils```
 
 ## Usage
 ### Prepare mammogram images in png format and construct meta file (.json) linking image path (png) and clincal variables and ground-truth labels.
