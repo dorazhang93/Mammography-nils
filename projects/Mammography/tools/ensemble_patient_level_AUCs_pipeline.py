@@ -246,10 +246,7 @@ def main():
                 print(
                     f"{datasetname}, {task} r2 :{task_result_overall['r2']}, pearsonr: {task_result_overall['pearsonr']} ")
 
-    results={"overall":overall,"bootstrap":bootstrap,
-             "patient level prediction":{'predicts':data_dict['patient-level prediction']['N'].predict.values.tolist(),
-                                         'patient_ids':data_dict['patient-level prediction']['N'].fortnr.values.tolist(),
-                                         'gt_labels':data_dict['patient-level prediction']['N'].gt_label.values.tolist()},}
+    results={"overall":overall,"bootstrap":bootstrap,"auc_curve":auc_curves}
     with open(f"{args.work_dir}/{args.out_file}","w") as f:
         f.write(json.dumps(results))
 
