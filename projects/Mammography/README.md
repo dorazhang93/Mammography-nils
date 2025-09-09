@@ -10,7 +10,7 @@ To get a local copy up and running, follow steps below to train and test the DL 
 
 ### Prerequisites
 
-python 3.8.18, check environment.yml for needed packages. The listed lib-verions have been tested on CUDA version 12.
+Conda is needed to set up the python environment; check environment.yml for configuration of the virtual environment. The listed lib-verions have been tested on CUDA version 12.
 
 ### Installation
 
@@ -20,13 +20,13 @@ python 3.8.18, check environment.yml for needed packages. The listed lib-verions
 
 2.Create conda environment
 
-```conda env create --name VIR_ENV_NAME --file=environment.yml --force```
+```cd Mammography-nils```
+
+```conda env create --name VIR_ENV_NAME --file=projects/Mammography/environment.yml --force```
 
 ### Activate the created conda environment
 
 ```conda activate VIR_ENV_NAME```
-
-```cd Mammography-nils```
 
 ## Usage
 ### Prepare mammogram images in png format and construct meta file (.json) linking image path (png) and clincal variables and ground-truth labels.
@@ -92,9 +92,11 @@ Definitions of clinical variables will be attached.
 python projects/Mammography/mlp.py --data-root ${data_root} --mode "clinical-mammo" \
           --work-dir ${out_dir} >${out_dir}/out.log
 ```
-### Evaluate DL piplines
+### Evaluate DL pipeline from end to end
 
-To evaluate trained model:
+'scripts/test_pipeline.sh' shows an example to run the developed DL pipeline from mammograms of DICOM format to performance metrics.
+
+Command to run images on trained model and to calculate performance metrics :
 ```
 python tools/test.py projects/Mammography/configs/${EXP}.py ${best_ckpt} --work-dir work_dirs_test/ --out ${out_dir}/test/best_rd${r2}.json --out-item metrics
 ```
