@@ -6,6 +6,7 @@ DATASET_ROOT="/HOME_FOLDER/mmpretrain/projects/Mammography/DM_preprocess/test_ex
 python projects/Mammography/DM_preprocess/generate_json_meta.py --input-csv ${INPUT_CSV}  \
   --input-image-format "dicom" \
   --output-folder ${DATASET_ROOT}
+wait
 
 # 2. run double-CV models on independent test sets
 echo "@@@@@ Step 2: run double-CV models using the generated json meta file @@@@@"
