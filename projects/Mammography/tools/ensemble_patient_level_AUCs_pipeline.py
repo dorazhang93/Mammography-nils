@@ -12,7 +12,7 @@ import json
 
 
 
-MULTI_TASKS=['multifocality', 'LVI', 'tumor_size', 'N', 'NumPos']
+MULTI_TASKS=['multifocality', 'LVI', 'tumor_size', 'N',]
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Ensemble across k-fold models prediction and across multiple mammos'

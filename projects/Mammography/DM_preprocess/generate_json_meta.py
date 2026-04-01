@@ -38,6 +38,7 @@ if __name__=="__main__":
         view = meta_df.loc[i,'view']
         laterality = meta_df.loc[i,'laterality']
         ln = meta_df.loc[i, 'LNM']
+        tsize = meta_df.loc[i, 'Tsize']
         manufacturer = meta_df.loc[i, 'manufacturer']
         if args.input_image_format == 'png':
             raw_image_path=meta_df.loc[i, 'png_path']
@@ -76,7 +77,7 @@ if __name__=="__main__":
 
         cv2.imwrite(png_imagename, image_processed)
         meta_dict['data_list'].append({'img_path': png_imagename,
-                                       'gt_label':{'N':int(ln)},
+                                       'gt_label':{'N':int(ln),'tumor_size':float(tsize)},
                                        'clinic_vars':None}
                                       )
 
