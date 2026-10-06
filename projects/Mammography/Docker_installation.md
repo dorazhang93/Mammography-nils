@@ -55,4 +55,5 @@ The run the evaluation pipeline:
 bash projects/Mammography/scripts/test_pipeline.sh /in_out/{IMAGE_FOLDER}/meta.csv /in_out/{OUTPUT_FOLDER} /in_out/{MODEL_FOLDER}
 ````
 OUTPUT_FOLDER is decided by the user.
+To run cohort-lever performance metrics such as AUC and pearsonr r, change the `--mode` parameter from `patient-level` to `cohort-level` in the step 3 in `test_pipeline.sh` 
 
