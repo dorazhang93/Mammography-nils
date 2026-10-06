@@ -40,6 +40,8 @@ if __name__=="__main__":
     else:
         raise ValueError(f"{args.input_csv} does not exist!!!")
 
+    DATA_ROOT=Path(args.input_csv).resolve().parents[0]
+
     meta_df=meta_df.replace({'LNM':{'P':1,'N':0}}) if 'LNM' in meta_df.columns else meta_df # encode LNM for calculating AUC
                                                                                             # if not available, place null
 
@@ -57,10 +59,10 @@ if __name__=="__main__":
         manufacturer = meta_df.loc[i, 'manufacturer'] if 'manufacturer' in meta_df.columns else None
         if args.input_image_format == 'png':
             raw_image_path=meta_df.loc[i, 'png_path']
-            image = cv2.imread(raw_image_path)
+            image = cv2.imread(DATA_ROOT/raw_image_path)
         elif args.input_image_format == 'dicom':
             raw_image_path=meta_df.loc[i, 'dicom_path']
-            image = dicom.dcmread(raw_image_path)
+            image = dicom.dcmread(DATA_ROOT/raw_image_path)
         else:
             raise ValueError(f"Invalid input image format {args.input_image_format}!!!")
 
