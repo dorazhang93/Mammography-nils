@@ -7,6 +7,8 @@ processor = DMImagePreprocessor()
 from collections import defaultdict
 import pydicom as dicom
 import cv2
+import hashlib
+
 
 def parse_args():
     parser=argparse.ArgumentParser(description="Generate json meta file for test cohort")
@@ -16,15 +18,30 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def check_meta(df, format):
+    if format == 'png':
+        print(f"Processing PNG images")
+        must_fields=['png_path', 'patient_id']
+    elif format == 'dicom':
+        print(f"Processing DICOM images")
+        must_fields = ['dicom_path', 'patient_id']
+    else:
+        raise ValueError(f"Invalid input format {format}!!!")
+    return all(tag in df.columns for tag in must_fields)
+
 if __name__=="__main__":
     args = parse_args()
 
     if os.path.exists(args.input_csv):
         print(f"Loading meta csv file from ", args.input_csv)
         meta_df = pd.read_csv(args.input_csv) #  columns including 'dicom_path', 'patient_id', 'view', 'laterality', 'LNM'
+        if not check_meta(meta_df, args.input_image_format):
+            raise ValueError(f"Invalid csv file: {args.input_csv} with absence of dicom_path or patient_id")
     else:
         raise ValueError(f"{args.input_csv} does not exist!!!")
-    meta_df=meta_df.replace({'LNM':{'P':1,'N':0}})
+
+    meta_df=meta_df.replace({'LNM':{'P':1,'N':0}}) if 'LNM' in meta_df.columns else meta_df # encode LNM for calculating AUC
+                                                                                            # if not available, place null
 
     Path(args.output_folder).mkdir(exist_ok=True, parents=True)
     png_folder = f"{args.output_folder}/png_cropped_breast"
@@ -32,14 +49,12 @@ if __name__=="__main__":
     print(f"Png images will be save to {png_folder}")
 
     meta_dict = {'data_list':[]}
-    png_store=defaultdict(list)
+
     for i in range(len(meta_df)):
         patient_id = meta_df.loc[i,'patient_id']
-        view = meta_df.loc[i,'view']
-        laterality = meta_df.loc[i,'laterality']
-        ln = meta_df.loc[i, 'LNM']
-        tsize = meta_df.loc[i, 'Tsize']
-        manufacturer = meta_df.loc[i, 'manufacturer']
+        ln = meta_df.loc[i, 'LNM'] if 'LNM' in meta_df.columns else None
+        tsize = meta_df.loc[i, 'Tsize'] if 'Tsize' in meta_df.columns else None
+        manufacturer = meta_df.loc[i, 'manufacturer'] if 'manufacturer' in meta_df.columns else None
         if args.input_image_format == 'png':
             raw_image_path=meta_df.loc[i, 'png_path']
             image = cv2.imread(raw_image_path)
@@ -69,15 +84,18 @@ if __name__=="__main__":
         else:
             image_processed = image_processed[breast_bbox[1]:breast_bbox[1] + breast_bbox[3], breast_bbox[0]:breast_bbox[0] + breast_bbox[2]]
 
-        png_imagename = f"{png_folder}/{patient_id}_{view}_{laterality}"
-
-        # add visit number to image name
-        png_store[png_imagename].append(1)
-        png_imagename = f"{png_imagename}_visit{sum(png_store[png_imagename])}.png"
+        key = f"{patient_id}|{raw_image_path}"
+        png_imagename = f"{png_folder}/{patient_id}_{hashlib.sha1(key.encode()).hexdigest()[:16]}.png"
 
         cv2.imwrite(png_imagename, image_processed)
+        gt_label={}
+        if ln is not None:
+            gt_label['N']=int(ln)
+        if tsize is not None:
+            gt_label['tumor_size']=float(tsize)
+
         meta_dict['data_list'].append({'img_path': png_imagename,
-                                       'gt_label':{'N':int(ln),'tumor_size':float(tsize)},
+                                       'gt_label':gt_label,
                                        'clinic_vars':None}
                                       )
 

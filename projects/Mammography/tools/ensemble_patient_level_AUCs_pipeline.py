@@ -24,6 +24,8 @@ def parse_args():
     parser.add_argument('--bootstrap-repeat-num', type=int, default=1000,help='repeat numbers of bootstrap sampling')
     parser.add_argument('--multi-prediction', action='store_true', help='enable parsing multi-task predictions')
     parser.add_argument('--single-endpoint', type=str, default='N', help='the single task to investigate on')
+    parser.add_argument('--mode', type=str, default='patient-level', help='Whether to conduct patient-level prediction'
+                                                                          'or to conduct cohort-level performance analysis')
     args = parser.parse_args()
     return args
 
@@ -198,58 +200,82 @@ def main():
     data = load_multi_prediction(args) if args.multi_prediction else load_single_prediction(args)
 
 
-    data_dict={'patient-level prediction':data}
+    data_dict={'all patients':data}
 
-    # overall performance metrics, AUCs for BC, r2 for regression tasks
-    overall={}
-    #bootstrap results
-    bootstrap={}
-    #AUC_curve points
-    auc_curves={}
-    bootstrap_repeat_num=args.bootstrap_repeat_num
+    tasks_valid = []
     for datasetname, data in data_dict.items():
-        overall[datasetname]={}
-        bootstrap[datasetname]={}
-        auc_curves[datasetname]={}
         for task in data.keys():
-            print(f"{datasetname} has {len(data[task])} patients for {task} prediction")
-            if task in ['multifocality', 'LVI', 'N']:
-                task_result_overall, task_result_bootstrap=binary_classify_result(data,task,bootstrap_repeat_num)
-                overall[datasetname][task]=task_result_overall
-                bootstrap[datasetname][task]=task_result_bootstrap
-                print(
-                    f"{datasetname}, {task} prediction| roc :{task_result_overall['roc']}, "
-                    f"pr :{task_result_overall['pr']} \n"
-                    f"Bootstrap result|", task_result_bootstrap)
-                auc_curves[datasetname][task]=auc_curve_result(data,task)
+            if len(data[task].shape) > 1:
+                tasks_valid.append(task)
 
-            elif task == 'NumPos':
-                if args.Npos_softmax:
+    if args.mode == 'patient-level':
+        results = {"patient level prediction": {
+                       task: {'predicts': data_dict['all patients'][task].predict.values.tolist(),
+                              'patient_ids': data_dict['all patients'][
+                                  task].fortnr.values.tolist(),
+                              'gt_labels': data_dict['all patients'][
+                                  task].gt_label.values.tolist()
+                              }
+                       for task in tasks_valid}, }
+    else:
+        # overall performance metrics, AUCs for BC, r2 for regression tasks
+        overall = {}
+        # bootstrap results
+        bootstrap = {}
+        # AUC_curve points
+        auc_curves = {}
+        bootstrap_repeat_num = args.bootstrap_repeat_num
+
+        for datasetname, data in data_dict.items():
+            overall[datasetname] = {}
+            bootstrap[datasetname] = {}
+            auc_curves[datasetname] = {}
+            for task in tasks_valid:
+                print(f"{datasetname} has {len(data[task])} patients for {task} prediction")
+                if task in ['multifocality', 'LVI', 'N']:
                     task_result_overall, task_result_bootstrap = binary_classify_result(data, task,
                                                                                         bootstrap_repeat_num)
                     overall[datasetname][task] = task_result_overall
                     bootstrap[datasetname][task] = task_result_bootstrap
                     print(
-                        f"{datasetname}, {task} roc :{task_result_overall['roc']}, "
-                        f"pr :{task_result_overall['pr']}")
+                        f"{datasetname}, {task} prediction| roc :{task_result_overall['roc']}, "
+                        f"pr :{task_result_overall['pr']} \n"
+                        f"Bootstrap result|", task_result_bootstrap)
+                    auc_curves[datasetname][task] = auc_curve_result(data, task)
 
+                elif task == 'NumPos':
+                    if args.Npos_softmax:
+                        task_result_overall, task_result_bootstrap = binary_classify_result(data, task,
+                                                                                            bootstrap_repeat_num)
+                        overall[datasetname][task] = task_result_overall
+                        bootstrap[datasetname][task] = task_result_bootstrap
+                        print(
+                            f"{datasetname}, {task} roc :{task_result_overall['roc']}, "
+                            f"pr :{task_result_overall['pr']}")
+
+                    else:
+                        task_result_overall, task_result_bootstrap = regress_result(data, task, bootstrap_repeat_num)
+                        overall[datasetname][task] = task_result_overall
+                        bootstrap[datasetname][task] = task_result_bootstrap
+                        print(
+                            f"{datasetname}, {task} r2 :{task_result_overall['r2']} , pearsonr: {task_result_overall['pearsonr']}")
                 else:
                     task_result_overall, task_result_bootstrap = regress_result(data, task, bootstrap_repeat_num)
                     overall[datasetname][task] = task_result_overall
                     bootstrap[datasetname][task] = task_result_bootstrap
                     print(
-                        f"{datasetname}, {task} r2 :{task_result_overall['r2']} , pearsonr: {task_result_overall['pearsonr']}")
-            else:
-                task_result_overall, task_result_bootstrap = regress_result(data, task, bootstrap_repeat_num)
-                overall[datasetname][task] = task_result_overall
-                bootstrap[datasetname][task] = task_result_bootstrap
-                print(
-                    f"{datasetname}, {task} r2 :{task_result_overall['r2']}, pearsonr: {task_result_overall['pearsonr']} ")
+                        f"{datasetname}, {task} r2 :{task_result_overall['r2']}, pearsonr: {task_result_overall['pearsonr']} ")
 
-    results={"overall":overall,"bootstrap":bootstrap,
-             "patient level prediction":{'predicts':data_dict['patient-level prediction']['N'].predict.values.tolist(),
-                                     'patient_ids':data_dict['patient-level prediction']['N'].fortnr.values.tolist(),
-                                     'gt_labels':data_dict['patient-level prediction']['N'].gt_label.values.tolist()},}
+        results = {"overall": overall, "bootstrap": bootstrap,
+                   "patient level prediction": {
+                       task: {'predicts': data_dict['all patients'][task].predict.values.tolist(),
+                              'patient_ids': data_dict['all patients'][
+                                  task].fortnr.values.tolist(),
+                              'gt_labels': data_dict['all patients'][
+                                  task].gt_label.values.tolist()
+                              }
+                       for task in tasks_valid}, }
+
     with open(f"{args.work_dir}/{args.out_file}","w") as f:
         f.write(json.dumps(results))
 
