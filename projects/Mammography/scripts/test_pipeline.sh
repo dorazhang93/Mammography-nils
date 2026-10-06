@@ -4,6 +4,7 @@ INPUT_CSV="$1" # file path to meta.csv
 DATASET_ROOT="$2" # output folder to processed pngs and model predictions
 OUTPATH="$3" # path to the saved double-CV models
 
+PREDICTION_OUT_DIR=${DATASET_ROOT}/prediction
 
 PROJECT_PATH="$(dirname "$(dirname "$(realpath "$0")")")"
 echo "$PROJECT_PATH"
@@ -22,7 +23,6 @@ echo "@@@@@ Step 2: run double-CV models using the generated json meta file @@@@
 #OUTPATH="work_dirs_phase2_unfreeze/fullimage1792x1024_resnet50-expan2_ssl_finetune_transformer_Aug3_barlowtwins_2cv_multitask" # folder to the saved models
 EXP="fullimage1792x1024_resnet50-expan2_ssl_finetune_transformer_Aug3"
 CUDA_DEVICE=0
-PREDICTION_OUT_DIR=${DATASET_ROOT}/prediction
 mkdir -p ${PREDICTION_OUT_DIR}
 for r1 in {0..4}; do
   out_dir="${OUTPATH}""/""${r1}"

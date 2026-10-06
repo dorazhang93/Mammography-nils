@@ -133,25 +133,25 @@ def load_prediction_2cv_ignore_gt(args, task):
                 raise ValueError(f"{args.work_dir}/{fd1}/{fd2}/predict.pkl does not exist!!!")
             for i in range(len(predictions)):
                 predict= predictions[i][task] if task in predictions[i].keys() else predictions[i]
-                print(predict)
-                # label = predict['gt_label'].numpy()[0]
-                if task in ['multifocality', 'LVI', 'N']:
-                    pre_score = scipy.special.expit(predict['pred_score'].numpy()[0])
-                elif task == 'NumPos':
-                    if args.Npos_softmax:
-                        pre_score = F.softmax(predict['pred_score']).numpy()
-                        pre_score = pre_score[1] + pre_score[2]
-                    else:
+                if 'gt_label' in predict:
+                    if task in ['multifocality', 'LVI', 'N']:
                         pre_score = scipy.special.expit(predict['pred_score'].numpy()[0])
-                else:
-                    pre_score = predict['pred_score'].numpy()[0]
-                if 'img_path' in predict:
-                    imagename = predict['img_path'].split("/")[-1]
-                    fortnr = imagename.split("_")[0]
-                else:
-                    imagename = 'Unknown'
-                    fortnr = predict['fortnr']
-                data.append([fortnr, imagename, pre_score, fd1, fd2])
+                    elif task == 'NumPos':
+                        if args.Npos_softmax:
+                            pre_score = F.softmax(predict['pred_score']).numpy()
+                            pre_score = pre_score[1] + pre_score[2]
+                        else:
+                            pre_score = scipy.special.expit(predict['pred_score'].numpy()[0])
+                    else:
+                        pre_score = predict['pred_score'].numpy()[0]
+                    if 'img_path' in predict:
+                        imagename = predict['img_path'].split("/")[-1]
+                        fortnr = imagename.split("_")[0]
+                    else:
+                        imagename = 'Unknown'
+                        fortnr = predict['fortnr']
+                    data.append([fortnr, imagename, pre_score, fd1, fd2])
+
 
     data=pd.DataFrame(data,columns=['fortnr','imagename','predict','5fold','5run'])
     data = data.groupby(['fortnr', 'imagename']).agg(predict=('predict', 'mean')).reset_index()
@@ -262,8 +262,6 @@ def main():
                        task: {'predicts': data_dict['all patients'][task].predict.values.tolist(),
                               'patient_ids': data_dict['all patients'][
                                   task].fortnr.values.tolist(),
-                              'gt_labels': data_dict['all patients'][
-                                  task].gt_label.values.tolist()
                               }
                        for task in tasks_valid}, }
     else:
