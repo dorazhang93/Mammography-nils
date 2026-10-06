@@ -91,8 +91,12 @@ if __name__=="__main__":
         gt_label={}
         if ln is not None:
             gt_label['N']=int(ln)
+        else:
+            gt_label['N']=-999
         if tsize is not None:
             gt_label['tumor_size']=float(tsize)
+        else:
+            gt_label['tumor_size']=-999
 
         meta_dict['data_list'].append({'img_path': png_imagename,
                                        'gt_label':gt_label,

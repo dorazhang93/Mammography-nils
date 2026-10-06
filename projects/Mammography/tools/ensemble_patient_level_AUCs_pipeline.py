@@ -73,7 +73,7 @@ def load_prediction_1cv(args, task):
 
     return data
 
-def load_prediction_2cv(args, task):
+def load_prediction_2cv_gt(args, task):
     k_fold=args.k_fold
     print(f"loading double {k_fold}-fold cross-validation test predictions {task}")
     data=[]
@@ -119,6 +119,55 @@ def load_prediction_2cv(args, task):
                                                  predict=('predict', 'max')).reset_index()
     print(f"loaded {task} predictions for {len(data)} patients ")
     return data
+
+def load_prediction_2cv_ignore_gt(args, task):
+    k_fold=args.k_fold
+    print(f"loading double {k_fold}-fold cross-validation test predictions {task}")
+    data=[]
+    for fd1 in range(k_fold):
+        for fd2 in range(k_fold):
+            if os.path.exists(f"{args.work_dir}/{fd1}/{fd2}/predict.pkl"):
+                print(f"loading file, {args.work_dir}/{fd1}/{fd2}/predict.pkl")
+                predictions=pickle.load(open(f"{args.work_dir}/{fd1}/{fd2}/predict.pkl","rb"))
+            else:
+                raise ValueError(f"{args.work_dir}/{fd1}/{fd2}/predict.pkl does not exist!!!")
+            for i in range(len(predictions)):
+                predict= predictions[i][task] if task in predictions[i].keys() else predictions[i]
+                print(predict)
+                # label = predict['gt_label'].numpy()[0]
+                if task in ['multifocality', 'LVI', 'N']:
+                    pre_score = scipy.special.expit(predict['pred_score'].numpy()[0])
+                elif task == 'NumPos':
+                    if args.Npos_softmax:
+                        pre_score = F.softmax(predict['pred_score']).numpy()
+                        pre_score = pre_score[1] + pre_score[2]
+                    else:
+                        pre_score = scipy.special.expit(predict['pred_score'].numpy()[0])
+                else:
+                    pre_score = predict['pred_score'].numpy()[0]
+                if 'img_path' in predict:
+                    imagename = predict['img_path'].split("/")[-1]
+                    fortnr = imagename.split("_")[0]
+                else:
+                    imagename = 'Unknown'
+                    fortnr = predict['fortnr']
+                data.append([fortnr, imagename, pre_score, fd1, fd2])
+
+    data=pd.DataFrame(data,columns=['fortnr','imagename','predict','5fold','5run'])
+    data = data.groupby(['fortnr', 'imagename']).agg(predict=('predict', 'mean')).reset_index()
+    print(f"loaded {task} predictions for {len(data)} images ")
+
+    data = data.groupby(['fortnr']).agg(predict=('predict', 'max')).reset_index()
+    print(f"loaded {task} predictions for {len(data)} patients ")
+    return data
+
+def load_prediction_2cv(args,task):
+
+    if args.mode == 'cohort-level':
+        return load_prediction_2cv_gt(args, task)
+    elif args.mode == 'patient-level':
+        return load_prediction_2cv_ignore_gt(args, task)
+
 
 def load_multi_prediction(args):
     multi_data={}

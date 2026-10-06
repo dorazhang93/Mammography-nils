@@ -4,6 +4,7 @@ INPUT_CSV="$1" # file path to meta.csv
 DATASET_ROOT="$2" # output folder to processed pngs and model predictions
 OUTPATH="$3" # path to the saved double-CV models
 
+
 PROJECT_PATH="$(dirname "$(dirname "$(realpath "$0")")")"
 echo "$PROJECT_PATH"
 
