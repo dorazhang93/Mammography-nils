@@ -50,6 +50,10 @@ if __name__=="__main__":
     Path(png_folder).mkdir(exist_ok=True, parents=True)
     print(f"Png images will be save to {png_folder}")
 
+    thumbnail_folder = f"{args.output_folder}/thumbnails"
+    Path(thumbnail_folder).mkdir(exist_ok=True, parents=True)
+    print(f"Thumbnail images of 256*256 will be save to {thumbnail_folder}")
+
     meta_dict = {'data_list':[]}
 
     for i in range(len(meta_df)):
@@ -86,10 +90,15 @@ if __name__=="__main__":
         else:
             image_processed = image_processed[breast_bbox[1]:breast_bbox[1] + breast_bbox[3], breast_bbox[0]:breast_bbox[0] + breast_bbox[2]]
 
+        thumbnail = cv2.resize(image_processed, (256, 256), interpolation = cv2.INTER_AREA)
         key = f"{patient_id}|{raw_image_path}"
-        png_imagename = f"{png_folder}/{patient_id}_{hashlib.sha1(key.encode()).hexdigest()[:16]}.png"
+        uid = hashlib.sha1(key.encode()).hexdigest()[:16]
+        png_imagename = f"{png_folder}/{patient_id}_{uid}.png"
+        thumbnail_imagename = f"{thumbnail_folder}/{patient_id}_{uid}.png"
 
         cv2.imwrite(png_imagename, image_processed)
+        cv2.imwrite(thumbnail_imagename, thumbnail)
+
         gt_label={}
         if ln is not None:
             gt_label['N']=int(ln)
