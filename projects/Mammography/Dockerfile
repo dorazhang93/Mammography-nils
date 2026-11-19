@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 git ninja-build 
     && rm -rf /var/lib/apt/lists/*
 
 # Install MIM
-RUN pip install openmim pandas pydicom scikit-learn Pillow==9.5.0
+RUN pip install timm openmim pandas pydicom scikit-learn Pillow==9.5.0
 
 # Install MMPretrain
 RUN conda clean --all
