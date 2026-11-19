@@ -1,0 +1,9 @@
+{
+  "source": "training set",
+  "percentile": 5.0,
+  "tau": {
+    "object": 0.95,
+    "quality": 0.6,
+    "fov": 0.8
+  }
+}

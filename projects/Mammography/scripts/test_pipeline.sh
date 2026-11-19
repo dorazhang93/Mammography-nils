@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
 
 INPUT_CSV="$1" # file path to meta.csv
-DATASET_ROOT="$2" # output folder to processed pngs and model predictions
+OUT_ROOT="$2" # output folder to processed pngs and model predictions
 OUTPATH="$3" # path to the saved double-CV models
 
-PREDICTION_OUT_DIR=${DATASET_ROOT}/prediction
+PREDICTION_OUT_DIR=${OUT_ROOT}/node_prediction
 
 PROJECT_PATH="$(dirname "$(dirname "$(realpath "$0")")")"
 echo "$PROJECT_PATH"
 
 # 1. set up png images and meta file
-echo "@@@@@ Step 1: run image preprocessing to generate png files with cropped breasts and a json meta file @@@@@"
-#INPUT_CSV="$PROJECT_PATH""/DM_preprocess/test_examples/meta.csv"
-#DATASET_ROOT="$PROJECT_PATH""/DM_preprocess/test_examples"
+echo "@@@@@ Step 1: run image AC and preprocessing to generate png files with cropped breasts and a json meta file @@@@@"
+DM_PREPROCESS_OUT=${OUT_ROOT}/qc_preprocess
+mkdir -p ${DM_PREPROCESS_OUT}
 python projects/Mammography/DM_preprocess/generate_json_meta.py --input-csv ${INPUT_CSV}  \
-  --input-image-format "dicom" \
-  --output-folder ${DATASET_ROOT}
+  --output-folder ${DM_PREPROCESS_OUT} \
+  --qc-checkpoint projects/Mammography/DM_preprocess/enb0_imagenet_refine_omidb/final.pt \
+  --device "cuda:0"
+
 wait
 
 # 2. run double-CV models on independent test sets
@@ -38,7 +40,7 @@ for r1 in {0..4}; do
     CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python tools/test.py ${out_dir}/${EXP}.py ${best_ckpt} --work-dir work_dirs_test/ \
       --out ${prediction_folder}/predict.pkl \
       --out-item pred \
-      --cfg-options test_dataloader.dataset.data_root=${DATASET_ROOT} \
+      --cfg-options test_dataloader.dataset.data_root=${DM_PREPROCESS_OUT} \
       test_dataloader.dataset.ann_file=test.json \
       log_level=INFO > run_models_log.txt #TODO: to debug, this can be turned to DEBUG
     wait
@@ -46,7 +48,7 @@ for r1 in {0..4}; do
 done
 echo "DONE! Prediction probabilities were saved to ""${PREDICTION_OUT_DIR}"
 
-# 3. ensemble patient level prediction and calculate performance AUCs if mode=='cohort-levle'
+# 3. ensemble patient level prediction and calculate performance AUCs if mode=='cohort-level'
 echo "@@@@@ Step 3: ensemble patient level prediction and calculate performance AUCs @@@@@"
 python projects/Mammography/tools/ensemble_patient_level_AUCs_pipeline.py ${PREDICTION_OUT_DIR} --out-file "test_patient_AUCs.json" \
   --double-CV --multi-prediction --mode 'patient-level'
