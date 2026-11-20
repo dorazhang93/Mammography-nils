@@ -8,16 +8,14 @@ docker build --no-cache -f Dockerfile -t mammography-nils .
 This creates a Docker image named `mammography-nils`.
 
 ## Prepare input data and model files
-1. Prepare the input mammography images in DICOM format using the same directory structure as the provided `test_examples` folder.
-For example:
+1. Prepare the input mammography images in DICOM format under the same root folder as the meta.csv file, for example, as in the provided `test_examples` folder.
 ```
 test_examples/
-├── dicom/*.dcm
+├── dicom/*/*.dcm
 └── meta.csv
 ```
 For meta.csv with DICOM data, the pipeline expects `dicom_path` and `patient_id`. For png dataset, the pipeline expects `png_path` and `patient_id`.
-`manufacturer` is optional to refine the preprocessing (to surpress artifacts and to crop background) using vandor-specific hyperparameters.
-If `manufacturer` is unknown, the pipeline will use default settings, which has mainly been tested on GE and Seimens mammograms.
+`manufacturer` is optional to post-hoc analyses by manufacturer groups.
 The pipeline supports both producing patient-level predictions for LN probility (from 0 to 1) and tumor size (normalized), and producing cohort-level
 performance metrics. To enable cohort-level calculation, ground-truth values (`LNM` and `Tsize`) need to be provided in the `meta.csv`.
 Valid values for `LNM` include (P,N) or (1,0). Valid values for `Tsize` include numerical variables.
