@@ -237,6 +237,12 @@ class QCModel:
         else:
             row["normal_flag"]=False
 
+        # abnormal flagged that breast only AND full-breast but not FFDM
+        if row["pred_object"]=="breast_only" and row["pred_fov"]=="full_breast" and row["pred_quality"]!="FFDM":
+            row["abnormal_flag"]=True
+        else:
+            row["abnormal_flag"]=False
+
         row["abnormal"] = int(abnormal)
         row["abnormality"] = "; ".join(f"{t}={c}" for t, c in nonstd) if nonstd else (
             "low_p_standard" if abnormal else "")

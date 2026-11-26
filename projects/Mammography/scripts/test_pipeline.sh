@@ -10,7 +10,7 @@ PROJECT_PATH="$(dirname "$(dirname "$(realpath "$0")")")"
 echo "$PROJECT_PATH"
 
 # 1. set up png images and meta file
-echo "@@@@@ Step 1: run image AC and preprocessing to generate png files with cropped breasts and a json meta file @@@@@"
+echo "@@@@@ Step 1: run image QC and preprocessing to generate png files with cropped breasts and a json meta file @@@@@"
 DM_PREPROCESS_OUT=${OUT_ROOT}/qc_preprocess
 mkdir -p ${DM_PREPROCESS_OUT}
 python projects/Mammography/DM_preprocess/generate_json_meta.py --input-csv ${INPUT_CSV}  \
@@ -48,9 +48,9 @@ for r1 in {0..4}; do
 done
 echo "DONE! Prediction probabilities were saved to ""${PREDICTION_OUT_DIR}"
 
-# 3. ensemble patient level prediction and calculate performance AUCs if mode=='cohort-level'
+# 3. ensemble patient level prediction and calculate performance AUCs if mode=='GT'
 echo "@@@@@ Step 3: ensemble patient level prediction and calculate performance AUCs @@@@@"
 python projects/Mammography/tools/ensemble_patient_level_AUCs_pipeline.py ${PREDICTION_OUT_DIR} --out-file "test_patient_AUCs.json" \
-  --double-CV --multi-prediction --mode 'patient-level'
+  --double-CV --multi-prediction --mode 'no GT'
 
 echo "Performance metrics on patient level using model ensemble were saved to ""${PREDICTION_OUT_DIR}""/test_patient_AUCs.json"

@@ -10,8 +10,6 @@ from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, ro
 from scipy.stats import pearsonr
 import json
 
-
-
 MULTI_TASKS=['multifocality', 'LVI', 'tumor_size', 'N',]
 
 def parse_args():
@@ -24,8 +22,7 @@ def parse_args():
     parser.add_argument('--bootstrap-repeat-num', type=int, default=1000,help='repeat numbers of bootstrap sampling')
     parser.add_argument('--multi-prediction', action='store_true', help='enable parsing multi-task predictions')
     parser.add_argument('--single-endpoint', type=str, default='N', help='the single task to investigate on')
-    parser.add_argument('--mode', type=str, default='patient-level', help='Whether to conduct patient-level prediction'
-                                                                          'or to conduct cohort-level performance analysis')
+    parser.add_argument('--mode', type=str, choices=['GT', 'no GT'],default='GT', help='Whether ground-truth label is present or not')
     args = parser.parse_args()
     return args
 
@@ -55,7 +52,7 @@ def load_prediction_1cv(args, task):
                 else:
                     pre_score = predict['pred_score'].numpy()[0]
                 imagename = predict['img_path'].split("/")[-1]
-                fortnr = imagename.split("_")[0]
+                fortnr = ":".join(imagename.split("_")[:-1])
                 data.append([fortnr, imagename, label, pre_score, fd1])
     data=pd.DataFrame(data,columns=['fortnr','imagename','gt_label','predict','5fold'])
     data = data.groupby(['fortnr', 'imagename']).agg(gt_label=('gt_label', 'mean'),
@@ -102,7 +99,7 @@ def load_prediction_2cv_gt(args, task):
                         pre_score=predict['pred_score'].numpy()[0]
                     if 'img_path' in predict:
                         imagename=predict['img_path'].split("/")[-1]
-                        fortnr=imagename.split("_")[0]
+                        fortnr=":".join(imagename.split("_")[:-1])
                     else:
                         imagename='Unknown'
                         fortnr=predict['fortnr']
@@ -146,7 +143,7 @@ def load_prediction_2cv_ignore_gt(args, task):
                         pre_score = predict['pred_score'].numpy()[0]
                     if 'img_path' in predict:
                         imagename = predict['img_path'].split("/")[-1]
-                        fortnr = imagename.split("_")[0]
+                        fortnr = ":".join(imagename.split("_")[:-1])
                     else:
                         imagename = 'Unknown'
                         fortnr = predict['fortnr']
@@ -163,9 +160,9 @@ def load_prediction_2cv_ignore_gt(args, task):
 
 def load_prediction_2cv(args,task):
 
-    if args.mode == 'cohort-level':
+    if args.mode == 'GT':
         return load_prediction_2cv_gt(args, task)
-    elif args.mode == 'patient-level':
+    elif args.mode == 'no GT':
         return load_prediction_2cv_ignore_gt(args, task)
 
 
@@ -257,7 +254,7 @@ def main():
             if len(data[task].shape) > 1:
                 tasks_valid.append(task)
 
-    if args.mode == 'patient-level':
+    if args.mode == 'no GT':
         results = {"patient level prediction": {
                        task: {'predicts': data_dict['all patients'][task].predict.values.tolist(),
                               'patient_ids': data_dict['all patients'][

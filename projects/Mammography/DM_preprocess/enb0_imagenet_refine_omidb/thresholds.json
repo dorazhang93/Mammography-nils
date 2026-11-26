@@ -2,8 +2,8 @@
   "source": "training set",
   "percentile": 5.0,
   "tau": {
-    "object": 0.95,
-    "quality": 0.6,
-    "fov": 0.8
+    "object": 0.8697984218597412,
+    "quality": 0.6878597140312195,
+    "fov": 0.807036280632019
   }
 }

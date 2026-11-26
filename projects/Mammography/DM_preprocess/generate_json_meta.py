@@ -190,15 +190,20 @@ def run_qc(df: pd.DataFrame, args, qc_dir: Path) -> pd.DataFrame:
                 continue
             row.update(model.describe(probs, b, args.standard_threshold))
             nonstd = row.pop("_nonstandard")
-            row["qc_status"] = "normal" if not row['abnormal'] else "normal_flag" if row["normal_flag"] else "abnormal"
+            row["qc_status"] = "normal" if not row['abnormal'] else \
+                "normal_flag" if row["normal_flag"] else \
+                    "abnormal_flag" if row["abnormal_flag"] else "abnormal"
+
             img, name = x[b, 0].numpy(), meta["image_id"] + ".png"
             if not row["abnormal"]:
                 save_png01(thumb_dir / "normal" / name, img)
             else:
                 for task, cls in (nonstd or [("p_standard", "low_p_standard")]):
                     save_png01(thumb_dir / "abnormal" / task / cls / name, img)
-            if row["normal_flag"]:# abnormal cases with only needle detected are flagged but still kept for nodal prediction
+            if row["normal_flag"]:# normal cases with only needle detected are flagged but still kept for nodal prediction
                 save_png01(thumb_dir / "normal_flaged" / name, img)
+            if row["abnormal_flag"]:# abnormal cases with breast_only, full_breast and not FFDM
+                save_png01(thumb_dir / "abnormal_flaged" / name, img)
             rows.append(row)
         if len(rows) % 500 < len(idx):
             logger.info("  QC %d/%d images (%.1f img/s)", len(rows), len(df), len(rows) / (time.time() - t0))
@@ -372,7 +377,9 @@ def main(argv=None) -> int:
         return 0
 
     # Stage 2 ---------------------------------------------------------------
-    normal_uids = set(qc_table.loc[qc_table["qc_status"].isin(["normal","normal_flag"]), "uid"])
+    included_flags=["normal","normal_flag","abnormal_flag"]
+    logger.info("Images included for stage 2 preprocessing: %s", ", ".join(included_flags))
+    normal_uids = set(qc_table.loc[qc_table["qc_status"].isin(included_flags), "uid"])
     normal = df[df["uid"].isin(normal_uids)].reset_index(drop=True)
     if normal.empty:
         (out_dir / "run_summary.json").write_text(json.dumps(summary, indent=2))
